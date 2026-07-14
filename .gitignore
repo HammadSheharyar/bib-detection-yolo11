@@ -1,0 +1,82 @@
+# -----------------------------
+# Python
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.venv/
+venv/
+env/
+
+# -----------------------------
+# VS Code
+# -----------------------------
+.vscode/
+.idea/
+
+# -----------------------------
+# Dataset (ignore all datasets)
+# -----------------------------
+dataset/
+data/
+images/
+labels/
+
+# dataset folder
+bib number labeling.v3i.yolov11/
+
+# Dataset archives
+*.zip
+*.rar
+*.7z
+*.tar
+*.tar.gz
+
+# -----------------------------
+# YOLO Training Outputs
+# -----------------------------
+runs/
+weights/
+*.pt
+*.onnx
+*.engine
+*.torchscript
+
+# -----------------------------
+# Images & Videos
+# -----------------------------
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.tif
+*.tiff
+*.gif
+*.mp4
+*.avi
+*.mov
+
+# -----------------------------
+# Labels
+# -----------------------------
+*.txt
+*.cache
+
+# -----------------------------
+# Logs
+# -----------------------------
+logs/
+*.log
+
+# -----------------------------
+# Jupyter
+# -----------------------------
+.ipynb_checkpoints/
+
+# -----------------------------
+# OS Files
+# -----------------------------
+.DS_Store
+Thumbs.db
