@@ -1,6 +1,6 @@
 """
-Train YOLO11n on bib detection dataset.
-Tuned for a 4GB VRAM GPU (Quadro M1200 / Maxwell arch).
+YOLO11n on bib detection dataset.
+4GB VRAM GPU (Quadro M1200 / Maxwell arch).
 
 Usage:
     python train.py
