@@ -46,3 +46,17 @@ Recall (mean)   : 0.9225181598062954
 
 Per-class mAP50-95:
   bib-number: 0.6880
+
+
+
+
+  while converting to tesnortt use same imgsize used in training, other wise detections will be effected, bcz by default imgsize is 640
+  also u can not pass the imgsize parameter to model.predict( ) using tesnorrt engine file
+
+
+  issues we got on predictions:
+
+
+  So re-exporting or precision wasn't the issue — the model itself scores real bibs lower when it sees them inside a person-crop than when it sees them in a full scene. That rules out the fp16 engine as the culprit and confirms the fix has to be at the data/training level, as I flagged as the likely outcome.
+
+  Real fix (retrain on crop-style data)
