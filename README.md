@@ -280,3 +280,278 @@ runs/
 - ✅ TensorRT deployment supported
 - ⚠️ Always export TensorRT using the same image size used during training.
 - ⚠️ For cropped-person inference, retraining with crop-style data is recommended.
+
+# Bib Number Detection using YOLO26n
+
+## Overview
+
+This project trains a **YOLO26n (Ultralytics YOLO)** object detection model to detect **race bib numbers** in images. The model is fine-tuned on a custom dataset containing labeled bib number bounding boxes and achieves high detection accuracy while maintaining fast inference speed.
+
+---
+
+## Model Information
+
+| Property | Value |
+|----------|-------|
+| Model | YOLO26n |
+| Framework | Ultralytics YOLO v8.4.102 |
+| Python | 3.12.13 |
+| PyTorch | 2.10.0 + CUDA 12.8 |
+| GPUs | 2 × Tesla T4 |
+| Image Size | 512 × 512 |
+| Task | Object Detection |
+| Classes | 1 (Bib Number) |
+
+---
+
+# Dataset
+
+The dataset consists of annotated race images with bib numbers labeled using YOLO format.
+
+```
+dataset/
+│
+├── train/
+│   ├── images/
+│   └── labels/
+│
+├── valid/
+│   ├── images/
+│   └── labels/
+│
+└── data.yaml
+```
+
+### Dataset Statistics
+
+| Split | Images |
+|--------|--------|
+| Train | 4014 |
+| Validation | 502 |
+| Total | 4516 |
+
+### Classes
+
+```
+0 : Bib Number
+```
+
+---
+
+# Training Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Epochs | 100 |
+| Batch Size | 32 |
+| Image Size | 512 |
+| Optimizer | AdamW (Auto Selected) |
+| Learning Rate | 0.002 |
+| Weight Decay | 0.0005 |
+| Mixed Precision | Enabled (AMP) |
+| Multi-GPU | Yes (2 × Tesla T4) |
+| Early Stopping | Patience = 20 |
+
+Training command:
+
+```python
+from ultralytics import YOLO
+
+model = YOLO("yolo26n.pt")
+
+model.train(
+    data="data.yaml",
+    epochs=100,
+    imgsz=512,
+    batch=32,
+    device=[0,1],
+    name="yolo26n_bib"
+)
+```
+
+---
+
+# Training Results
+
+## Final Validation Metrics
+
+| Metric | Score |
+|---------|-------|
+| Precision | **0.903** |
+| Recall | **0.897** |
+| mAP@50 | **0.937** |
+| mAP@50-95 | **0.596** |
+
+These results indicate excellent detection accuracy with strong precision and recall on the validation dataset.
+
+---
+
+# Performance
+
+| Metric | Time |
+|---------|------|
+| Preprocess | 0.1 ms |
+| Inference | 1.2 ms |
+| Postprocess | 0.8 ms |
+
+Average inference speed per image:
+
+**≈ 2.1 ms/image**
+
+---
+
+# Model Size
+
+| File | Size |
+|------|------|
+| best.pt | 5.4 MB |
+| last.pt | 5.4 MB |
+
+Model summary:
+
+- Parameters: **2,375,031**
+- GFLOPs: **5.2**
+
+---
+
+# Results Directory
+
+```
+runs/
+└── yolo26n_bib/
+    ├── weights/
+    │   ├── best.pt
+    │   └── last.pt
+    │
+    ├── labels.jpg
+    ├── results.png
+    ├── results.csv
+    └── args.yaml
+```
+
+---
+
+# Inference
+
+Load the trained model:
+
+```python
+from ultralytics import YOLO
+
+model = YOLO("best.pt")
+```
+
+Run inference on an image:
+
+```python
+results = model.predict(
+    source="image.jpg",
+    imgsz=512,
+    conf=0.25,
+    save=True
+)
+```
+
+Run inference on a folder:
+
+```python
+model.predict(
+    source="images/",
+    save=True
+)
+```
+
+Run inference on a video:
+
+```python
+model.predict(
+    source="video.mp4",
+    save=True
+)
+```
+
+---
+
+# Export Model
+
+Export to ONNX:
+
+```python
+model.export(format="onnx")
+```
+
+Export to TensorRT:
+
+```python
+model.export(format="engine")
+```
+
+Export to TorchScript:
+
+```python
+model.export(format="torchscript")
+```
+
+---
+
+# Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/your-username/bib-number-detection.git
+cd bib-number-detection
+```
+
+Install dependencies:
+
+```bash
+pip install ultralytics
+```
+
+Verify installation:
+
+```bash
+yolo checks
+```
+
+---
+
+# Notes
+
+- The training log reported a warning indicating that a few segmentation annotations were present in an otherwise detection-only dataset. During training, these segmentation labels were ignored, and only bounding boxes were used.
+- Automatic Mixed Precision (AMP) was enabled to improve training efficiency.
+- The optimizer was automatically selected by Ultralytics as **AdamW**.
+- Mosaic augmentation was automatically disabled during the final training epochs for improved convergence.
+
+---
+
+# Future Improvements
+
+- Train larger YOLO variants (YOLO26s, YOLO26m, YOLO26l)
+- Increase image resolution (640 or 768)
+- Add more diverse race environments
+- Perform hyperparameter tuning
+- Deploy using TensorRT for real-time inference
+- Integrate OCR for automatic bib number recognition after detection
+
+---
+
+# Citation
+
+If you use this project in your research or applications, please cite the Ultralytics YOLO framework:
+
+```bibtex
+@software{ultralytics,
+  author = {Ultralytics},
+  title = {Ultralytics YOLO},
+  year = {2025},
+  url = {https://github.com/ultralytics/ultralytics}
+}
+```
+
+---
+
+## License
+
+This project is intended for educational and research purposes. Please ensure that any dataset used complies with its respective license and usage terms.
