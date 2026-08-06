@@ -34,8 +34,14 @@
 
 from ultralytics import YOLO
 
-BEST_WEIGHTS = "runs/detect/runs_bib/yolo11n_bib_v1/weights/best.pt"
-SOURCE = "peoplw.png"
+# BEST_WEIGHTS = "runs/detect/runs_bib/yolo11n_bib_v1/weights/best.pt"
+# BEST_WEIGHTS = "bestyolo26n.pt"
+SOURCE = "test_images_2"
+
+
+BEST_WEIGHTS = "yolo11n-new/best.pt"
+
+# SOURCE = "dataset/test/images"
 
 
 def main():
@@ -43,7 +49,7 @@ def main():
 
     results = model.predict(
         source=SOURCE,
-        imgsz=512,
+        imgsz=640,
         conf=0.2,
         iou=0.45,
         device=0,
