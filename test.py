@@ -1,57 +1,74 @@
 from pathlib import Path
+from datetime import datetime
 import cv2
 import numpy as np
 from ultralytics import YOLO
 
 
 # ============================================================
-# CONFIG — switch approach here
+# CONFIG
 # ============================================================
-APPROACH = "two_stage"   # "direct" = bib model on full image
-                      # "two_stage" = person detect -> torso crop -> bib model
+APPROACH = "direct"   # "direct" or "two_stage"
 
-# Bib detection model (your trained weights)
 BIB_WEIGHTS = "yolo11n-new/best.pt"
-#BIB_WEIGHTS = "bibModelBest_server2.pt"
+# BIB_WEIGHTS = "bibModelBest_server2.pt"
 
+PERSON_WEIGHTS = "yolo11x.pt"
 
-# Person detection model (pretrained COCO YOLO) — only used in two_stage
-PERSON_WEIGHTS = "yolo11x.pt"   # auto-downloads on first run
+SOURCE = "img (3).jpg"
 
-SOURCE = "img (3).jpg"           # image path, folder, or video
-
-# Inference params
 IMGSZ = 640
 CONF = 0.2
 IOU = 0.45
-DEVICE = 0                  # 0 = first GPU, "cpu" for CPU
+DEVICE = 0
 
 # Two-stage tuning
-PERSON_CONF = 0.35          # lower = more persons detected (may include FP)
-TORSO_TOP = 0.15            # crop top fraction of person bbox (skip head)
-TORSO_BOTTOM = 0.65         # crop bottom fraction (skip legs)
-TORSO_PAD = 0.05            # extra padding around torso (fraction of bbox)
+PERSON_CONF = 0.35
+TORSO_TOP = 0.15
+TORSO_BOTTOM = 0.65
+TORSO_PAD = 0.05
+
+# Output root — same style as ultralytics
+RUNS_ROOT = "runs"
+
+
+# ============================================================
+# Output folder (per run)
+# ============================================================
+def make_run_dir(approach: str) -> Path:
+    """
+    Create a unique run directory like:
+        runs/detect/direct_20251013_143022/
+    If a same-second folder exists, appends _2, _3, ...
+    """
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base = Path(RUNS_ROOT) / "detect" / f"{approach}_{stamp}"
+
+    if base.exists():
+        i = 2
+        while (base.parent / f"{base.name}_{i}").exists():
+            i += 1
+        base = base.parent / f"{base.name}_{i}"
+
+    base.mkdir(parents=True, exist_ok=False)
+    return base
 
 
 # ============================================================
 # Helpers
 # ============================================================
 def torso_crop(img, xyxy, top=TORSO_TOP, bottom=TORSO_BOTTOM, pad=TORSO_PAD):
-    """Return a torso crop of a person bbox and its coords in the original image."""
     x1, y1, x2, y2 = map(int, xyxy)
     h = y2 - y1
     w = x2 - x1
 
-    # torso vertical slice
     ty1 = int(y1 + top * h)
     ty2 = int(y1 + bottom * h)
 
-    # horizontal padding
     px = int(pad * w)
     tx1 = max(0, x1 - px)
     tx2 = min(img.shape[1], x2 + px)
 
-    # clamp
     ty1 = max(0, ty1)
     ty2 = min(img.shape[0], ty2)
 
@@ -70,7 +87,6 @@ def draw_box(img, xyxy, label=None, color=(0, 255, 0), thickness=2):
 
 
 def load_source(source):
-    """Load image(s). Returns list of (path, ndarray)."""
     p = Path(source)
     if p.is_dir():
         exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -89,10 +105,10 @@ def load_source(source):
 
 
 # ============================================================
-# Approach 1: direct bib detection on full image
+# Approach 1: direct
 # ============================================================
-def run_direct(bib_model, items):
-    print("\n=== Approach: DIRECT (bib model on full image) ===")
+def run_direct(bib_model, items, out_dir: Path):
+    print(f"\n=== Approach: DIRECT ===\nSaving to: {out_dir}")
     for path, img in items:
         results = bib_model.predict(
             source=img, imgsz=IMGSZ, conf=CONF, iou=IOU,
@@ -105,42 +121,44 @@ def run_direct(bib_model, items):
             conf = float(box.conf[0])
             draw_box(vis, xyxy, label=f"{conf:.2f}", color=(0, 255, 0))
 
-        out = f"out_direct_{Path(path).stem}.jpg"
-        cv2.imwrite(out, vis)
+        out = out_dir / f"{Path(path).stem}.jpg"
+        cv2.imwrite(str(out), vis)
         print(f"{path} -> {len(r.boxes)} bib(es)  | saved {out}")
 
 
 # ============================================================
-# Approach 2: person -> torso -> bib model
+# Approach 2: person -> torso -> bib
 # ============================================================
-def run_two_stage(person_model, bib_model, items):
-    print("\n=== Approach: TWO-STAGE (person -> torso -> bib) ===")
+def run_two_stage(person_model, bib_model, items, out_dir: Path):
+    print(f"\n=== Approach: TWO-STAGE ===\nSaving to: {out_dir}")
+
+    # optional: also save intermediate torso crops for debugging
+    crops_dir = out_dir / "torso_crops"
+    crops_dir.mkdir(exist_ok=True)
+
     for path, img in items:
-        # 1) detect persons
         pres = person_model.predict(
             source=img, imgsz=IMGSZ, conf=PERSON_CONF, iou=IOU,
-            classes=[0],          # COCO class 0 = person
-            device=DEVICE, verbose=False,
+            classes=[0], device=DEVICE, verbose=False,
         )[0]
 
         vis = img.copy()
         total_bibs = 0
+        stem = Path(path).stem
 
-        for pbox in pres.boxes:
+        for i, pbox in enumerate(pres.boxes):
             pxyxy = pbox.xyxy[0].cpu().numpy()
-
-            # draw person bbox (blue)
             draw_box(vis, pxyxy, label="person", color=(255, 128, 0), thickness=1)
 
-            # 2) crop torso
             crop, (tx1, ty1, tx2, ty2) = torso_crop(img, pxyxy)
             if crop.size == 0:
                 continue
 
-            # draw torso region (yellow, dashed feel via thin line)
             draw_box(vis, (tx1, ty1, tx2, ty2), color=(0, 255, 255), thickness=1)
 
-            # 3) bib detection on crop
+            # save torso crop (debug)
+            cv2.imwrite(str(crops_dir / f"{stem}_person{i}.jpg"), crop)
+
             bres = bib_model.predict(
                 source=crop, imgsz=IMGSZ, conf=CONF, iou=IOU,
                 device=DEVICE, verbose=False,
@@ -150,7 +168,6 @@ def run_two_stage(person_model, bib_model, items):
                 bx1, by1, bx2, by2 = bbox.xyxy[0].cpu().numpy()
                 conf = float(bbox.conf[0])
 
-                # map back to original image coords
                 gx1 = tx1 + bx1
                 gy1 = ty1 + by1
                 gx2 = tx1 + bx2
@@ -160,8 +177,8 @@ def run_two_stage(person_model, bib_model, items):
                          label=f"bib {conf:.2f}", color=(0, 255, 0), thickness=2)
                 total_bibs += 1
 
-        out = f"out_twostage_{Path(path).stem}.jpg"
-        cv2.imwrite(out, vis)
+        out = out_dir / f"{stem}.jpg"
+        cv2.imwrite(str(out), vis)
         print(f"{path} -> {len(pres.boxes)} person(s), {total_bibs} bib(es)  | saved {out}")
 
 
@@ -177,17 +194,25 @@ def main():
     print(f"Loaded {len(items)} image(s) from '{SOURCE}'")
     bib_model = YOLO(BIB_WEIGHTS)
 
+    out_dir = make_run_dir(APPROACH)
+
     if APPROACH == "direct":
-        run_direct(bib_model, items)
+        run_direct(bib_model, items, out_dir)
     elif APPROACH == "two_stage":
         person_model = YOLO(PERSON_WEIGHTS)
-        run_two_stage(person_model, bib_model, items)
+        run_two_stage(person_model, bib_model, items, out_dir)
     else:
         raise ValueError(f"Unknown APPROACH: {APPROACH}")
+
+    print(f"\n✅ Done. Results in: {out_dir}")
 
 
 if __name__ == "__main__":
     main()
+
+
+
+
 
 
 
